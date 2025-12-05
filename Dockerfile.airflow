@@ -1,0 +1,30 @@
+FROM apache/airflow:2.7.1-python3.11
+
+USER root
+
+# Instalar Java y dependencias necesarias para el Cliente de Spark
+RUN apt-get update && \
+    (apt-get install -y openjdk-17-jdk-headless || apt-get install -y default-jdk-headless) && \
+    apt-get install -y procps curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Variables para que Airflow encuentre Spark
+ENV JAVA_HOME=/usr/lib/jvm/default-java
+ENV SPARK_VERSION=3.5.1
+ENV HADOOP_VERSION=3
+ENV SPARK_HOME=/opt/spark
+# Asegurar que PATH incluya los posibles directorios donde está el binario 'airflow'
+ENV PATH="${SPARK_HOME}/bin:/opt/airflow/.local/bin:/usr/local/bin:/usr/bin:/bin:${PATH}"
+
+# Descargar binarios de Spark (Cliente)
+RUN curl -fSL "https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz" \
+    --output spark.tgz \
+    && mkdir -p ${SPARK_HOME} \
+    && tar -xzf spark.tgz -C ${SPARK_HOME} --strip-components=1 \
+    && rm spark.tgz
+
+# Instalar provider de Spark para Airflow como root (asegura ubicación global)
+RUN pip install --no-cache-dir apache-airflow-providers-apache-spark
+
+# cambiar a usuario airflow para correr el contenedor
+USER airflow

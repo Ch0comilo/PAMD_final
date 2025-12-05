@@ -1,0 +1,43 @@
+# 1. Usar la imagen base de Python 3.11
+FROM python:3.11-slim
+
+# Variables de entorno
+ENV SPARK_VERSION=3.5.1
+ENV HADOOP_VERSION=3
+ENV JAVA_HOME=/usr/lib/jvm/default-java
+ENV SPARK_HOME=/opt/spark
+ENV PATH="${SPARK_HOME}/bin:${PATH}"
+ENV JUPYTER_TOKEN="hola-mundo"
+
+# 2. Instalar dependencias del sistema (Java 17 es más estable con Spark 3.5 que la 21)
+RUN apt-get update && \
+    (apt-get install -y openjdk-17-jdk-headless || apt-get install -y default-jdk-headless) && \
+    apt-get install -y curl tini procps rsync dos2unix libpq-dev gcc && \
+    rm -rf /var/lib/apt/lists/*
+
+# 3. Descargar Spark
+RUN curl -fSL "https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop${HADOOP_VERSION}.tgz" \
+    --output spark.tgz \
+    && mkdir -p ${SPARK_HOME} \
+    && tar -xzf spark.tgz -C ${SPARK_HOME} --strip-components=1 \
+    && rm spark.tgz
+
+# 4. Instalar librerías Python
+# Copiamos requirements si existe, sino instalamos lo básico manual
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt || \
+    pip install --no-cache-dir jupyterlab pyspark mlflow psycopg2-binary
+
+# 5. Preparar script de inicio
+WORKDIR /app
+COPY start.sh .
+RUN dos2unix start.sh && chmod +x start.sh
+
+# Directorios para volúmenes
+RUN mkdir -p /app/notebooks /app/mlflow_artifacts
+
+# 6. Puertos: Jupyter, Spark UI, Spark Master, MLflow
+EXPOSE 8888 8080 7077 5000
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["/app/start.sh"]

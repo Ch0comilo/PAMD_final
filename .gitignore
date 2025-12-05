@@ -1,2 +1,7 @@
-/clase 27.10.html
+*.log
+logs/
+__pycache__/
+.gitignore
+/notebooks/
+/data/
 *.parquet
